@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Priority Scheduling Algorithm</title>
+    <link rel="stylesheet" href="style/general.css" />
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+  </head>
+
+  <body>
+    <header>Process Scheduling</header>
+    <div class="container">
+      <div class="sidebar">
+        <h2>Algorithms</h2>
+        <ul>
+          <li>
+            <a href="fcfs.html">First Come First Serve</a>
+          </li>
+          <li>
+            <a href="priorityNP.html"><b>&#10148; Priority (NP)</b></a>
+          </li>
+          <li><a href="priorityP.html">Priority (P)</a></li>
+          <li><a href="sjnNP.html">Shortest Job Next (NP)</a></li>
+          <li><a href="sjnP.html">Shortest Job Next (P)</a></li>
+          <li><a href="roundrobin.html">Round Robin</a></li>
+        </ul>
+      </div>
+      <div class="content">
+        <h1>Non-Preemptive Priority Scheduling Algorithm</h1>
+        <div class="content-container">
+          <div id="processInputs">
+            <h2>Process Information</h2>
+            <label for="numProcesses">Enter the number of processes:</label>
+            <input type="number" id="numProcesses" min="1" required />
+            <br />
+            <button onclick="setProcesses()">Set Process</button>
+            <br /><br />
+            <div id="inputFields"></div>
+          </div>
+          <div id="resultsContainer">
+            <h2>Results</h2>
+            <div id="results" style="display: none">
+              <div id="gantt" style="position: relative; margin-top: 20px">
+                The results will appear here.
+              </div>
+              <div id="processDetails">
+                <table id="resultsTable">
+                  <h2>Process Details</h2>
+                  <thead>
+                    <tr>
+                      <th>Process ID</th>
+                      <th>Arrival Time</th>
+                      <th>Burst Time</th>
+                      <th>Priority</th>
+                      <th>Start Time</th>
+                      <th>Completion Time</th>
+                      <th>Turnaround Time</th>
+                      <th>Waiting Time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let processes = [];
+
+      function setProcesses() {
+        const numProcesses = document.getElementById("numProcesses").value;
+
+        if (numProcesses < 1) {
+          swal("Error", "The number of processes must be at least 1.", "error");
+          return;
+        }
+
+        const inputFields = document.getElementById("inputFields");
+        inputFields.innerHTML = ""; // Clear previous inputs
+
+        for (let i = 0; i < numProcesses; i++) {
+          inputFields.innerHTML += `
+                    <div class="inputContainer">
+                        <label><h3>Process ${i + 1}</h3></label>
+                        <label>Arrival Time:</label>
+                        <input type="number" min="0" class="arrivalTime" required>
+                        &nbsp; &nbsp;
+                        <label>Burst Time:</label>
+                        <input type="number" min="1"  class="burstTime" required>
+                        &nbsp; &nbsp;
+                        <label>Priority:</label>
+                        <input type="number" min="1"  class="priority" required>
+                    </div> 
+                `;
+        }
+        inputFields.innerHTML += `<button onclick="getProcessInfoPriority()">Calculate</button>`;
+        document.getElementById("processInputs").style.display = "block";
+      }
+
+      function getProcessInfoPriority() {
+        const arrivalTimes = Array.from(
+          document.querySelectorAll(".arrivalTime")
+        ).map((input) => parseInt(input.value));
+        const burstTimes = Array.from(
+          document.querySelectorAll(".burstTime")
+        ).map((input) => parseInt(input.value));
+        const priorities = Array.from(
+          document.querySelectorAll(".priority")
+        ).map((input) => parseInt(input.value));
+
+        // Validate inputs
+        if (
+          arrivalTimes.includes(NaN) ||
+          burstTimes.includes(NaN) ||
+          priorities.includes(NaN)
+        ) {
+          swal("Error", "All fields must be filled out.", "error");
+          return;
+        }
+
+        for (let at of arrivalTimes) {
+          if (at < 0) {
+            swal("Error", "Arrival Time must be at least 0.", "error");
+            return;
+          }
+        }
+
+        for (let bt of burstTimes) {
+          if (bt < 1) {
+            swal("Error", "Burst Time must be at least 1.", "error");
+            return;
+          }
+        }
+        for (let pr of priorities) {
+          if (pr < 1) {
+            swal("Error", "Priority must be at least 1.", "error");
+            return;
+          }
+        }
+
+        // Initialize processes array
+        processes = arrivalTimes.map((at, index) => ({
+          id: index + 1,
+          arrivalTime: at,
+          burstTime: burstTimes[index],
+          priority: priorities[index],
+          startTime: 0,
+          completionTime: 0,
+          turnaroundTime: 0,
+          waitingTime: 0,
+        }));
+
+        let currentTime = 0;
+        let completedProcesses = 0;
+        const n = processes.length;
+
+        while (completedProcesses < n) {
+          // Filter processes that have arrived and not yet completed
+          let availableProcesses = processes.filter(
+            (p) => p.arrivalTime <= currentTime && p.completionTime === 0
+          );
+
+          if (availableProcesses.length > 0) {
+            // Sort by priority, then by arrival time
+            availableProcesses.sort((a, b) => {
+              if (a.priority === b.priority) {
+                return a.arrivalTime - b.arrivalTime; // Sort by arrival time if priorities are equal
+              }
+              return a.priority - b.priority; // Sort by priority (lower number = higher priority)
+            });
+
+            // Select the process with the highest priority (lowest priority number)
+            let currentProcess = availableProcesses[0];
+            currentProcess.startTime = currentTime;
+            currentProcess.completionTime =
+              currentTime + currentProcess.burstTime;
+            currentProcess.turnaroundTime =
+              currentProcess.completionTime - currentProcess.arrivalTime;
+            currentProcess.waitingTime =
+              currentProcess.turnaroundTime - currentProcess.burstTime;
+
+            // Move to the next time point
+            currentTime = currentProcess.completionTime; // Update current time
+            completedProcesses++; // Increment completed processes
+          } else {
+            currentTime++; // If no processes are available, just increment time
+          }
+        }
+
+        // Calculate averages
+        const totalCompletionTime = processes.reduce(
+          (sum, p) => sum + p.completionTime,
+          0
+        );
+        const totalTurnaroundTime = processes.reduce(
+          (sum, p) => sum + p.turnaroundTime,
+          0
+        );
+        const totalWaitingTime = processes.reduce(
+          (sum, p) => sum + p.waitingTime,
+          0
+        );
+
+        const avgCompletionTime =
+          (totalCompletionTime / processes.length).toFixed(2) + " ms";
+        const avgTurnaroundTime =
+          (totalTurnaroundTime / processes.length).toFixed(2) + " ms";
+        const avgWaitingTime =
+          (totalWaitingTime / processes.length).toFixed(2) + " ms";
+
+        // Display results
+        displayResults(avgCompletionTime, avgTurnaroundTime, avgWaitingTime);
+        generateGanttChart(processes);
+      }
+
+      function displayResults(
+        avgCompletionTime,
+        avgTurnaroundTime,
+        avgWaitingTime
+      ) {
+        const resultsBody = document.getElementById("resultsBody");
+        resultsBody.innerHTML = ""; // Clear previous results
+
+        // Sort processes by completion time to display them in the order they finished
+        const sortedProcesses = [...processes].sort(
+          (a, b) => a.completionTime - b.completionTime
+        );
+
+        sortedProcesses.forEach((process) => {
+          resultsBody.innerHTML += `
+            <tr>
+                <td>P${process.id}</td>
+                <td>${process.arrivalTime}</td>
+                <td>${process.burstTime}</td>
+                <td>${process.priority}</td>
+                <td>${process.startTime}</td>
+                <td>${process.completionTime}</td>
+                <td>${process.turnaroundTime}</td>
+                <td>${process.waitingTime}</td>
+            </tr>
+        `;
+        });
+
+        resultsBody.innerHTML += `
+        <tr>
+            <td colspan="5"><strong>Averages</strong></td>
+            <td>${avgCompletionTime}</td>
+            <td>${avgTurnaroundTime}</td>
+            <td>${avgWaitingTime}</td>
+        </tr>
+    `;
+
+        document.getElementById("results").style.display = "block"; // Show results
+      }
+
+      function generateGanttChart(processes) {
+    const ganttDiv = document.getElementById("gantt");
+    ganttDiv.innerHTML = ""; // Clear previous chart
+
+    const boxWidth = 60; // Set a uniform box width
+    const boxHeight = 40; // Set the height of the boxes
+
+    // Sort processes by completion time to display them in the order they finished
+    const sortedProcesses = [...processes].sort(
+        (a, b) => a.completionTime - b.completionTime
+    );
+
+    let ganttHTML = `
+            <h2 style="text-align: center;">Gantt Chart</h2>
+            <div style="display: flex; justify-content: center; align-items: flex-start; gap: 15px; flex-wrap: wrap;">
+        `;
+
+    sortedProcesses.forEach((process) => {
+        const color = "#007bff"; // Color for the processes
+        ganttHTML += `
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div style="
+                        width: ${boxWidth}px; 
+                        height: ${boxHeight}px; 
+                        background-color: ${color};
+                        color: white; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center; 
+                        border-radius: 12px; 
+                        font-weight: bold;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                    ">
+                        P${process.id}
+                    </div>
+                    <div style="margin-top: 5px;">${process.startTime} - ${process.completionTime}</div>
+                </div>
+            `;
+    });
+
+    ganttHTML += "</div>"; // Close the Gantt chart container
+    ganttDiv.innerHTML = ganttHTML; // Update Gantt chart div
+}
+
+    </script>
+  </body>
+</html>

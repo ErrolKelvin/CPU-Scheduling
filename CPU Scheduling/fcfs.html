@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FCFS Scheduling Algorithm</title>
+    <link rel="stylesheet" href="style/general.css" />
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <!-- SweetAlert Library -->
+  </head>
+
+  <body>
+    <header>Process Scheduling</header>
+    <div class="container">
+      <div class="sidebar">
+        <h2>Algorithms</h2>
+        <ul>
+          <li>
+            <a href="fcfs.html"><b>&#10148; First Come First Serve</b></a>
+          </li>
+          <li><a href="priorityNP.html">Priority (NP)</a></li>
+          <li><a href="priorityP.html">Priority (P)</a></li>
+          <li><a href="sjnNP.html">Shortest Job Next (NP)</a></li>
+          <li><a href="sjnP.html">Shortest Job Next (P)</a></li>
+          <li><a href="roundrobin.html">Round Robin</a></li>
+        </ul>
+      </div>
+      <div class="content">
+        <h1>First Come, First Serve Scheduling Algorithm</h1>
+        <div class="content-container">
+          <div id="processInputs">
+            <h2>Process Information</h2>
+            <label for="numProcesses">Enter the number of processes:</label>
+            <input type="number" id="numProcesses" min="1" required />
+            <br />
+            <button onclick="setProcesses()">Set Process</button>
+            <br /><br />
+            <div id="inputFields"></div>
+          </div>
+          <div id="resultsContainer">
+            <h2>Results</h2>
+            <div id="results" style="display: none">
+              <div id="gantt" style="position: relative; margin-top: 20px">
+                The results will appear here.
+              </div>
+              <div id="processDetails">
+                <table id="resultsTable">
+                  <h2>Process Details</h2>
+                  <thead>
+                    <tr>
+                      <th>Process ID</th>
+                      <th>Arrival Time</th>
+                      <th>Burst Time</th>
+                      <th>Completion Time</th>
+                      <th>Turnaround Time</th>
+                      <th>Waiting Time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let processes = [];
+
+      function setProcesses() {
+        const numProcesses = document.getElementById("numProcesses").value;
+
+        // Validation
+        if (numProcesses < 1) {
+          swal("Error", "The number of processes must be at least 1.", "error");
+          return;
+        }
+
+        const inputFields = document.getElementById("inputFields");
+        inputFields.innerHTML = ""; // Clear previous inputs
+
+        for (let i = 0; i < numProcesses; i++) {
+          inputFields.innerHTML += `
+                    <div class="inputContainer">
+                    <label><h3>Process ${i + 1}</h3></label>
+                    <label>Arrival Time:</label>
+                    <input type="number" min="0" class="arrivalTime" required>
+                    &nbsp; &nbsp;
+                    <label> Burst Time:</label>
+                    <input type="number" min="1" class="burstTime" required>
+                    </div> 
+                `;
+        }
+        inputFields.innerHTML += `<button onclick="getProcessInfoFCFS()">Calculate</button>`;
+
+        document.getElementById("processInputs").style.display = "block";
+      }
+
+      function getProcessInfoFCFS() {
+        const arrivalTimes = Array.from(
+          document.querySelectorAll(".arrivalTime")
+        ).map((input) => parseInt(input.value));
+        const burstTimes = Array.from(
+          document.querySelectorAll(".burstTime")
+        ).map((input) => parseInt(input.value));
+
+        // Validation for empty fields, burst time, and arrival time
+        if (arrivalTimes.includes(NaN) || burstTimes.includes(NaN)) {
+          swal("Error", "All fields must be filled out.", "error");
+          return;
+        }
+
+        for (let at of arrivalTimes) {
+          if (at < 0) {
+            swal("Error", "Arrival Time must be at least 0.", "error");
+            return;
+          }
+        }
+
+        for (let bt of burstTimes) {
+          if (bt < 1) {
+            swal("Error", "Burst Time must be at least 1.", "error");
+            return;
+          }
+        }
+
+        processes = arrivalTimes.map((at, index) => ({
+          id: index + 1,
+          arrivalTime: at,
+          burstTime: burstTimes[index],
+        }));
+
+        // Sort processes by arrival time for FCFS scheduling
+        processes.sort((a, b) => a.arrivalTime - b.arrivalTime);
+
+        let currentTime = 0;
+        let totalCompletionTime = 0,
+          totalTurnaroundTime = 0,
+          totalWaitingTime = 0;
+
+        processes.forEach((process) => {
+          process.startTime = Math.max(currentTime, process.arrivalTime);
+          process.completionTime = process.startTime + process.burstTime;
+          process.turnaroundTime = process.completionTime - process.arrivalTime;
+          process.waitingTime = process.turnaroundTime - process.burstTime;
+
+          // Update totals for averages
+          totalCompletionTime += process.completionTime;
+          totalTurnaroundTime += process.turnaroundTime;
+          totalWaitingTime += process.waitingTime;
+
+          currentTime = process.completionTime;
+        });
+
+        // Calculate averages
+        const avgCompletionTime =
+          (totalCompletionTime / processes.length).toFixed(2) + " ms";
+        const avgTurnaroundTime =
+          (totalTurnaroundTime / processes.length).toFixed(2) + " ms";
+        const avgWaitingTime =
+          (totalWaitingTime / processes.length).toFixed(2) + " ms";
+
+        // Display results in a table
+        displayResults(avgCompletionTime, avgTurnaroundTime, avgWaitingTime);
+        generateGanttChart(processes);
+      }
+
+      function displayResults(
+        avgCompletionTime,
+        avgTurnaroundTime,
+        avgWaitingTime
+      ) {
+        const resultsBody = document.getElementById("resultsBody");
+        resultsBody.innerHTML = "";
+
+        processes.forEach((process) => {
+          resultsBody.innerHTML += `
+            <tr>
+                <td>P${process.id}</td>
+                <td>${process.arrivalTime}</td>
+                <td>${process.burstTime}</td>
+                <td>${process.completionTime}</td>
+                <td>${process.turnaroundTime}</td>
+                <td>${process.waitingTime}</td>
+            </tr>
+        `;
+        });
+
+        // Add averages row
+        resultsBody.innerHTML += `
+        <tr>
+            <td colspan="3"><strong>Averages</strong></td>
+            <td>${avgCompletionTime}</td>
+            <td>${avgTurnaroundTime}</td>
+            <td>${avgWaitingTime}</td>
+        </tr>
+    `;
+
+        document.getElementById("results").style.display = "block";
+      }
+
+      function generateGanttChart(processes) {
+        const ganttDiv = document.getElementById("gantt");
+        ganttDiv.innerHTML = ""; // Clear previous chart
+
+        // Define uniform box size and other styles
+        const boxWidth = 60; // Set a uniform box width
+        const boxHeight = 40; // Set the height of the boxes
+
+        // Create Gantt chart container
+        let ganttHTML = `
+        <h2 style="text-align: center;">Gantt Chart</h2>
+        <div style="display: flex; justify-content: center; align-items: flex-start; gap: 15px; flex-wrap:wrap;">
+    `;
+
+        let currentTime = 0; // Initialize current time
+
+        processes.forEach((process, index) => {
+          // Define a color for each process
+          const color = "#007bff";
+
+          // Determine the start time considering arrival time
+          const startTime = Math.max(currentTime, process.arrivalTime);
+          const endTime = startTime + process.burstTime;
+
+          ganttHTML += `
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div style="
+                    width: ${boxWidth}px; 
+                    height: ${boxHeight}px; 
+                    background-color:  ${color};
+                    color: white; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    border-radius: 12px; 
+                    font-weight: bold;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                ">
+                    P${process.id}
+                </div>
+                <div style="margin-top: 5px;">${startTime} - ${endTime}</div>
+            </div>
+        `;
+
+          currentTime = endTime; // Update current time
+        });
+
+        ganttHTML += "</div>"; // Close the Gantt chart container
+        ganttDiv.innerHTML = ganttHTML; // Update Gantt chart div
+      }
+    </script>
+  </body>
+</html>
